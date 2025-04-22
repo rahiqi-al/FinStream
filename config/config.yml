@@ -1,0 +1,6 @@
+PRODUCER:
+  PRODUCER_CONFIG: {'bootstrap.servers': 'kafka:9092'}
+  TOPIC_NAME: 'finnhub_trades'
+
+CONSUMER:
+  SERVER: 'kafka:9092'
