@@ -38,7 +38,6 @@ def on_open(ws):
 def producer():
     global producer
     try:
-        # Create Kafka topic if it doesn't exist
         admin = AdminClient(config.producer_config)
         if config.topic_name not in admin.list_topics().topics:
             topic = NewTopic(config.topic_name, num_partitions=1, replication_factor=1)
@@ -47,10 +46,10 @@ def producer():
         else:
             logger.info(f'Topic already exists: {config.topic_name}')
 
-        # Initialize Kafka producer
+        # initialize Kafka producer
         producer = Producer(config.producer_config)
 
-        # Start WebSocket connection
+        # start WebSocket connection
         websocket.enableTrace(False)
         ws = websocket.WebSocketApp(
             f"wss://ws.finnhub.io?token={config.finnhub_token}",

@@ -33,3 +33,11 @@ kafka :"""create topic:
         docker exec -it kafka kafka-console-producer --topic test-topic --bootstrap-server kafka:9092
         consumer:
         docker exec -it kafka kafka-console-consumer --topic test-topic --bootstrap-server kafka:9092 --from-beginning"""
+
+
+
+
+------------------------------------------------------------------------------------
+Runs /opt/bitnami/spark/sbin/start-master.sh & to start the master in the background(script starts the Spark master, binding it to port 7077)
+------------------------------------------------------------------------------------
+The global producer statement in producer() declares the producer variable as global, allowing it to be accessed and modified across functions. It’s used to share the Kafka Producer instance

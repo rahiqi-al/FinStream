@@ -109,6 +109,20 @@ services:
     networks:
       - app-net
 
+  streamlit:
+    image: python:3.9-slim
+    container_name: streamlit
+    depends_on:
+      - cassandra
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    command: sh -c "pip install streamlit pandas plotly cassandra-driver && streamlit run /app/app.py --server.port=8501 --server.address=0.0.0.0"
+    restart: unless-stopped
+    networks:
+      - app-net
+
   grafana:
     image: grafana/grafana-oss:11.6.0
     container_name: grafana

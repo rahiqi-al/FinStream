@@ -104,11 +104,7 @@ def consumer():
     spark = None
     try:
         logger.info('Starting the consumer')
-        spark = SparkSession.builder \
-            .appName("FinStreamProcessing") \
-            .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1") \
-            .config("spark.hadoop.fs.defaultFS", "file:///") \
-            .getOrCreate()
+        spark = SparkSession.builder.appName("FinStreamProcessing").config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1").getOrCreate()
         logger.info('Spark session created successfully')
 
         schema = StructType([
@@ -122,13 +118,7 @@ def consumer():
             StructField("type", StringType(), True)
         ])
 
-        df = spark.readStream \
-            .format('kafka') \
-            .option("kafka.bootstrap.servers", config.server) \
-            .option("subscribe", config.topic_name) \
-            .option("startingOffsets", "earliest") \
-            .option("group.id", "finstream-group") \
-            .load()
+        df = spark.readStream.format('kafka').option("kafka.bootstrap.servers", config.server).option("subscribe", config.topic_name).option("startingOffsets", "earliest").option("group.id", "finstream-group").load()
 
         df = df.select(from_json(col("value").cast("string"), schema).alias("data")) \
                .selectExpr("explode(data.data) as trade") \
@@ -140,25 +130,13 @@ def consumer():
                )
 
         # First Query: Write raw data to Cassandra
-        raw_query = df.writeStream \
-            .foreachBatch(store_cassandra_raw) \
-            .outputMode('append') \
-            .start()
+        raw_query = df.writeStream.foreachBatch(store_cassandra_raw).outputMode('append').start()
         logger.info('Raw data streaming query started')
 
         # Second Query: Aggregations every 5 seconds
-        aggregated_df = df.groupBy(
-            window((col("timestamp") / 1000).cast("timestamp"), "5 seconds"),
-            col("symbol")
-        ).agg(
-            avg("price").alias("avg_price"),
-            count("*").alias("trade_count")
-        )
+        aggregated_df = df.groupBy(window((col("timestamp") / 1000).cast("timestamp"), "5 seconds"),col("symbol")).agg(avg("price").alias("avg_price"),count("*").alias("trade_count"))
 
-        agg_query = aggregated_df.writeStream \
-            .foreachBatch(store_cassandra_aggregated) \
-            .outputMode('update') \
-            .start()
+        agg_query = aggregated_df.writeStream.foreachBatch(store_cassandra_aggregated).outputMode('update').start()
         logger.info('Aggregated data streaming query started')
 
         spark.streams.awaitAnyTermination()
@@ -169,5 +147,5 @@ def consumer():
         if spark:
             spark.stop()
 
-if __name__ == "__main__":
-    consumer()
+
+consumer()
