@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer
+  namespace: finstream
+  labels:
+    app: producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+    spec:
+      containers:
+      - name: producer
+        image: python:3.9
+        env:
+        - name: PYTHONPATH
+          value: "/project:/project/config"
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka:9092"
+        volumeMounts:
+        - name: project
+          mountPath: /project
+        - name: log
+          mountPath: /project/log
+        - name: producer-libs
+          mountPath: /usr/local/lib/python3.9/site-packages
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        command:
+        - sh
+        - -c
+        - |
+          curl -sSL https://bootstrap.pypa.io/get-pip.py | python3 &&
+          pip install confluent_kafka websocket-client python-dotenv pyyaml &&
+          echo "Listing /project:" &&
+          ls -l /project &&
+          echo "Listing /project/config:" &&
+          ls -l /project/config &&
+          echo "Listing /project/log:" &&
+          ls -l /project/log &&
+          echo "Content of /project/producer.py:" &&
+          cat /project/producer.py &&
+          echo "Content of /project/config/__init__.py:" &&
+          cat /project/config/__init__.py &&
+          echo "Content of /project/config/config.py:" &&
+          cat /project/config/config.py &&
+          echo "Content of /project/config/config.yml:" &&
+          cat /project/config/config.yml &&
+          echo "Content of /project/.env:" &&
+          cat /project/.env &&
+          echo "Python sys.path:" &&
+          python -c "import sys; print(sys.path)" &&
+          echo "Testing import:" &&
+          python -c "from config.config import config; print('Import successful:', config.finnhub_token)" &&
+          python /project/producer.py
+      volumes:
+      - name: project
+        configMap:
+          name: project-files
+          items:
+          - key: producer.py
+            path: producer.py
+          - key: consumer.py
+            path: consumer.py
+          - key: .env
+            path: .env
+          - key: __init__.py
+            path: config/__init__.py
+          - key: config.py
+            path: config/config.py
+          - key: config.yml
+            path: config/config.yml
+      - name: log
+        emptyDir: {}
+      - name: producer-libs
+        emptyDir: {}

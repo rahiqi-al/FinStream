@@ -1,0 +1,83 @@
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: finstream
+---
+# Zookeeper Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zookeeper
+  namespace: finstream
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      containers:
+      - name: zookeeper
+        image: confluentinc/cp-zookeeper:7.3.0
+        ports:
+        - containerPort: 2181
+        env:
+        - name: ZOOKEEPER_CLIENT_PORT
+          value: "2181"
+        - name: ZOOKEEPER_TICK_TIME
+          value: "2000"
+        - name: ZOOKEEPER_MAX_CLIENT_CNXNS
+          value: "60"
+        - name: ZOOKEEPER_LOG4J_LOGGERS
+          value: "zookeeper=DEBUG"
+        resources:
+          requests:
+            cpu: "0.1"
+            memory: "128Mi"
+          limits:
+            cpu: "0.5"
+            memory: "512Mi"
+        livenessProbe:
+          tcpSocket:
+            port: 2181
+          initialDelaySeconds: 180
+          timeoutSeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 2181
+          initialDelaySeconds: 240
+          timeoutSeconds: 10
+          periodSeconds: 10
+        startupProbe:
+          tcpSocket:
+            port: 2181
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+          periodSeconds: 10
+          failureThreshold: 30
+        command: ["sh", "-c", "/usr/bin/zookeeper-server-start /etc/kafka/zookeeper.properties >> /tmp/zookeeper.log 2>&1"]
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+---
+# Zookeeper Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  namespace: finstream
+spec:
+  selector:
+    app: zookeeper
+  ports:
+  - port: 2181
+    targetPort: 2181
+  type: ClusterIP

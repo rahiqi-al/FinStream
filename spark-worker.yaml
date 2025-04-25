@@ -1,0 +1,57 @@
+# spark-worker.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-worker
+  namespace: finstream
+  labels:
+    app: spark-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: spark-worker
+  template:
+    metadata:
+      labels:
+        app: spark-worker
+    spec:
+      containers:
+      - name: spark-worker
+        image: bitnami/spark:3.4.0  # Changed to 3.4.0
+        env:
+        - name: SPARK_MODE
+          value: "worker"
+        - name: SPARK_MASTER_URL
+          value: "spark://spark-master:7077"
+        - name: SPARK_WORKER_CORES
+          value: "2"
+        - name: SPARK_WORKER_MEMORY
+          value: "2g"
+        - name: PYTHONPATH
+          value: "/project:/project/config"
+        volumeMounts:
+        - name: project
+          mountPath: /project
+        - name: spark-libs
+          mountPath: /opt/bitnami/python/lib/python3.11/site-packages
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "2Gi"
+          limits:
+            cpu: "2000m"
+            memory: "3Gi"
+        command:
+        - sh
+        - -c
+        - |
+          /opt/bitnami/python/bin/pip3 install --no-cache-dir python-dotenv PyYAML confluent_kafka &&
+          /opt/bitnami/spark/sbin/start-worker.sh spark://spark-master:7077 &&
+          tail -f /dev/null
+      volumes:
+      - name: project
+        configMap:
+          name: project-files
+      - name: spark-libs
+        emptyDir: {}

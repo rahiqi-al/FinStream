@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamlit
+  namespace: finstream
+  labels:
+    app: streamlit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: streamlit
+  template:
+    metadata:
+      labels:
+        app: streamlit
+    spec:
+      containers:
+      - name: streamlit
+        image: python:3.9-slim
+        ports:
+        - containerPort: 8501
+        volumeMounts:
+        - name: app
+          mountPath: /app
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        command:
+        - sh
+        - -c
+        - |
+          pip install streamlit pandas plotly cassandra-driver &&
+          ls -l /app &&
+          streamlit run /app/app.py --server.port=8501 --server.address=0.0.0.0
+      volumes:
+      - name: app
+        configMap:
+          name: streamlit-app
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamlit
+  namespace: finstream
+spec:
+  selector:
+    app: streamlit
+  ports:
+  - protocol: TCP
+    port: 8501
+    targetPort: 8501
+  type: ClusterIP

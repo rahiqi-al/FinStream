@@ -1,0 +1,86 @@
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: finstream
+---
+# PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cassandra-data-pvc
+  namespace: finstream
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: standard
+---
+# Cassandra Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cassandra
+  namespace: finstream
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cassandra
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      containers:
+      - name: cassandra
+        image: cassandra:latest
+        ports:
+        - containerPort: 9042
+        env:
+        - name: CASSANDRA_CLUSTER_NAME
+          value: fintech
+        - name: JVM_OPTS
+          value: "-Xms128m -Xmx256m"
+        volumeMounts:
+        - name: cassandra-data
+          mountPath: /var/lib/cassandra
+        resources:
+          requests:
+            cpu: "0.2"
+            memory: "256Mi"
+          limits:
+            cpu: "0.5"
+            memory: "512Mi"
+        livenessProbe:
+          tcpSocket:
+            port: 9042
+          initialDelaySeconds: 180
+          timeoutSeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command: ["sh", "-c", "nodetool status | grep -w UN"]
+          initialDelaySeconds: 300
+          timeoutSeconds: 15
+          periodSeconds: 10
+      volumes:
+      - name: cassandra-data
+        persistentVolumeClaim:
+          claimName: cassandra-data-pvc
+---
+# Cassandra Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra
+  namespace: finstream
+spec:
+  selector:
+    app: cassandra
+  ports:
+  - port: 9042
+    targetPort: 9042
+  type: ClusterIP
