@@ -144,9 +144,43 @@ kubectl exec -it <new-master-pod> -n finstream -- bash
   --from-file=__init__.py=/home/ali/Desktop/FinStream/config/__init__.py \
   --from-file=config.py=/home/ali/Desktop/FinStream/config/config.py \
   --from-file=config.yml=/home/ali/Desktop/FinStream/config/config.yml \
-  --from-file=test_kafka.py=/home/ali/Desktop/FinStream/test_kafka.py \
   -n finstream --dry-run=client -o yaml | kubectl apply -f -
 
 
 
 kubectl exec -it spark-worker-85bcbf7fff-lkfjl  -n finstream -- /opt/bitnami/python/bin/pip3 install cassandra-driver
+
+
+
+
+1- configmap (remember there s  two  )
+2- remember pods have container and also you need to enter the container and run the script for consumer
+
+
+kubectl exec -it -n finstream kafka-5cf94b6fc6-8dnf2 -- kafka-topics.sh --bootstrap-server kafka:9092 --delete --topic finnhub_trades
+kubectl exec -it -n finstream kafka-5cf94b6fc6-8dnf2 -- kafka-topics.sh --bootstrap-server kafka:9092 --create --topic finnhub_trades --partitions 1 --replication-factor 1
+kubectl exec -it -n finstream spark-master-7f5784f74-htp48 -- rm -rf /tmp/checkpoint/agg
+kubectl exec -it -n finstream spark-master-7f5784f74-htp48 -- rm -rf /tmp/checkpoint/raw
+
+
+
+
+
+kubectl exec -it spark-master-7f5784f74-htp48 -n finstream -- /opt/bitnami/spark/bin/spark-submit     --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,com.datastax.spark:spark-cassandra-connector_2.12:3.5.1,com.github.jnr:jnr-posix:3.1.15     --executor-memory 2g     --executor-cores 4     /project/consumer.py
+
+
+kubectl exec -it spark-master-7f5784f74-htp48 -n finstream -- pkill -f spark-submit
+kubectl exec -it spark-master-7f5784f74-htp48 -n finstream -- rm -rf /tmp/checkpoint
+
+
+
+- **Event Time**: The timestamp in the data when the event occurred (e.g., `trade.t`, like `2025-04-27 19:41:09`).
+- **Ingestion Time**: The time Spark processes the data (e.g., `2025-04-27 23:34:54`).
+- **Watermark Difference**: Watermark (e.g., 10 seconds) sets the max gap between event time and the latest event time processed. If event time is too old (e.g., >10 seconds behind), it’s ignored.
+- **Key Issue**: Event time must be close to the latest event time, not ingestion time, to avoid being dropped by the watermark.
+
+
+
+
+
+kubectl apply -f configmaps.yaml -n finstream

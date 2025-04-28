@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-master
+  namespace: finstream
+  labels:
+    app: spark-master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-master
+  template:
+    metadata:
+      labels:
+        app: spark-master
+    spec:
+      securityContext:
+        runAsUser: 0  # Run as root
+      containers:
+      - name: spark-master
+        image: bitnami/spark:3.4.0
+        env:
+        - name: SPARK_MODE
+          value: "master"
+        - name: SPARK_MASTER_PORT
+          value: "7077"
+        - name: SPARK_MASTER_WEBUI_PORT
+          value: "8080"
+        - name: PYTHONPATH
+          value: "/project:/project/config"
+        - name: HOME
+          value: "/tmp"
+        ports:
+        - containerPort: 7077
+          name: spark
+        - containerPort: 8080
+          name: webui
+        volumeMounts:
+        - name: project
+          mountPath: /project
+        - name: spark-libs
+          mountPath: /opt/bitnami/python/lib/python3.11/site-packages
+        - name: log
+          mountPath: /project/log
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+        command:
+        - sh
+        - -c
+        - |
+          /opt/bitnami/python/bin/pip3 install --no-cache-dir python-dotenv PyYAML cassandra-driver confluent_kafka &&
+          /opt/bitnami/spark/sbin/start-master.sh &&
+          echo "Listing /project:" &&
+          ls -l /project &&
+          echo "Listing /project/config:" &&
+          ls -l /project/config &&
+          echo "Listing /project/log:" &&
+          ls -l /project/log &&
+          echo "Content of /project/consumer.py:" &&
+          cat /project/consumer.py &&
+          echo "Content of /project/config/__init__.py:" &&
+          cat /project/config/__init__.py &&
+          echo "Content of /project/config/config.py:" &&
+          cat /project/config/config.py &&
+          echo "Content of /project/config/config.yml:" &&
+          cat /project/config/config.yml &&
+          echo "Content of /project/.env:" &&
+          cat /project/.env &&
+          echo "Python sys.path:" &&
+          python -c "import sys; print(sys.path)" &&
+          echo "Testing import:" &&
+          python -c "from config.config import config; print('Import successful')" &&
+          /opt/bitnami/spark/bin/spark-submit \
+            --master spark://spark-master:7077 \
+            --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,com.datastax.spark:spark-cassandra-connector_2.12:3.5.1,com.github.jnr:jnr-posix:3.1.15 \
+            --executor-memory 2g \
+            --executor-cores 4 \
+            /project/consumer.py &
+          tail -f /opt/bitnami/spark/logs/spark--org.apache.spark.deploy.master.Master-1-*.out
+      volumes:
+      - name: project
+        configMap:
+          name: project-files
+          items:
+          - key: producer.py
+            path: producer.py
+          - key: consumer.py
+            path: consumer.py
+          - key: .env
+            path: .env
+          - key: __init__.py
+            path: config/__init__.py
+          - key: config.py
+            path: config/config.py
+          - key: config.yml
+            path: config/config.yml
+      - name: spark-libs
+        emptyDir: {}
+      - name: log
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-master
+  namespace: finstream
+spec:
+  selector:
+    app: spark-master
+  ports:
+  - name: spark
+    protocol: TCP
+    port: 7077
+    targetPort: 7077
+  - name: webui
+    protocol: TCP
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP

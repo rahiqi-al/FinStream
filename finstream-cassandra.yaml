@@ -1,10 +1,8 @@
-# Namespace
 apiVersion: v1
 kind: Namespace
 metadata:
   name: finstream
 ---
-# PersistentVolumeClaim
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -18,7 +16,19 @@ spec:
       storage: 2Gi
   storageClassName: standard
 ---
-# Cassandra Deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cassandra-config
+  namespace: finstream
+data:
+  cassandra.yaml: |
+    data_file_directories:
+      - /var/lib/cassandra/data
+    commitlog_directory: /var/lib/cassandra/commitlog
+    hints_directory: /var/lib/cassandra/hints
+    saved_caches_directory: /var/lib/cassandra/saved_caches
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -36,42 +46,54 @@ spec:
     spec:
       containers:
       - name: cassandra
-        image: cassandra:latest
+        image: cassandra:5.0.4
         ports:
         - containerPort: 9042
         env:
         - name: CASSANDRA_CLUSTER_NAME
           value: fintech
         - name: JVM_OPTS
-          value: "-Xms128m -Xmx256m"
+          value: "-Xms256m -Xmx512m -XX:+UseG1GC"
+        - name: CASSANDRA_CONFIG
+          value: "/cassandra-config/cassandra.yaml"
+        - name: CASSANDRA_DATA_DIR
+          value: "/var/lib/cassandra/data"
         volumeMounts:
         - name: cassandra-data
-          mountPath: /var/lib/cassandra
+          mountPath: "/var/lib/cassandra"
+        - name: cassandra-config
+          mountPath: "/cassandra-config/cassandra.yaml"
+          subPath: cassandra.yaml
         resources:
           requests:
-            cpu: "0.2"
-            memory: "256Mi"
-          limits:
             cpu: "0.5"
-            memory: "512Mi"
+            memory: "1Gi"
+          limits:
+            cpu: "1"
+            memory: "3Gi"
+        securityContext:
+          capabilities:
+            add: ["IPC_LOCK", "SYS_RESOURCE"]
         livenessProbe:
           tcpSocket:
             port: 9042
-          initialDelaySeconds: 180
-          timeoutSeconds: 10
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
           periodSeconds: 10
         readinessProbe:
-          exec:
-            command: ["sh", "-c", "nodetool status | grep -w UN"]
-          initialDelaySeconds: 300
-          timeoutSeconds: 15
+          tcpSocket:
+            port: 9042
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
           periodSeconds: 10
       volumes:
       - name: cassandra-data
         persistentVolumeClaim:
           claimName: cassandra-data-pvc
+      - name: cassandra-config
+        configMap:
+          name: cassandra-config
 ---
-# Cassandra Service
 apiVersion: v1
 kind: Service
 metadata:
