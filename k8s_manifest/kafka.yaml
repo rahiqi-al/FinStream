@@ -15,6 +15,21 @@ spec:
       labels:
         app: kafka
     spec:
+      initContainers:
+      - name: wait-for-zookeeper
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          until nc -z zookeeper 2181; do echo "Waiting for Zookeeper..."; sleep 5; done
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "200m"
+            memory: "128Mi"
       containers:
       - name: kafka
         image: bitnami/kafka:3.5.1
@@ -42,6 +57,12 @@ spec:
         ports:
         - containerPort: 9092
           name: kafka
+        readinessProbe:
+          tcpSocket:
+            port: 9092
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
         resources:
           requests:
             cpu: "500m"

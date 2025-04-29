@@ -50,8 +50,8 @@ spec:
         readinessProbe:
           tcpSocket:
             port: 2181
-          initialDelaySeconds: 240
-          timeoutSeconds: 10
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
           periodSeconds: 10
         startupProbe:
           tcpSocket:

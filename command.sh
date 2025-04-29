@@ -27,7 +27,7 @@ kafka :"""create topic:
 -------------------------------------------------------------------------------------------------------------------------------------------
 Cassandra:
 
- kubectl exec -it cassandra-665b4cb8cf-s7grs -n finstream -- cqlsh cassandra.finstream.svc.cluster.local 9042
+ kubectl exec -it cassandra-5767df698c-lp65j -n finstream -- cqlsh cassandra.finstream.svc.cluster.local 9042
   DESCRIBE KEYSPACE fintech;
   SELECT * FROM fintech.trades LIMIT 10;
   SELECT * FROM fintech.trade_aggregations LIMIT 10;
@@ -94,3 +94,30 @@ kubectl create configmap streamlit-app \
 
 
 kubectl describe configmap project-files -n finstream
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+1-
+  kubectl create namespace finstream
+  kubectl apply -f project-files-configmap.yaml -n finstream
+  kubectl apply -f streamlit-app-configmap.yaml -n finstream
+  kubectl apply -f zookeeper.yaml -n finstream
+  kubectl apply -f kafka.yaml -n finstream
+  kubectl apply -f cassandra.yaml -n finstream
+  kubectl apply -f producer.yaml -n finstream
+  kubectl apply -f spark_master.yaml -n finstream
+  kubectl apply -f spark-worker.yaml -n finstream
+  kubectl apply -f streamlit.yaml -n finstream
+  kubectl apply -f grafana.yaml -n finstream
+
+2-
+  kubectl exec -it spark-master-7f5784f74-htp48 -n finstream -- /opt/bitnami/spark/bin/spark-submit     --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,com.datastax.spark:spark-cassandra-connector_2.12:3.5.1,com.github.jnr:jnr-posix:3.1.15     --executor-memory 2g     --executor-cores 4     /project/consumer.py
+
+
+3-
+  kubectl port-forward svc/streamlit 8501:8501 -n finstream
+
+
+
